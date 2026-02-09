@@ -1,0 +1,79 @@
+definitions:
+  steps:
+
+    - step: &build_docker_script_step
+        name: "Build Docker Image"
+        services:
+          - docker
+        caches:
+          - docker
+        script:
+          - export ENVIRONMENT_NAME=${ENVIRONMENT_NAME}
+          - export ENABLE_ENV_PREFIX_IMAGE=true        
+          - IMAGE="supabase-mantra-ui"
+          - SHORT_SHA="$(echo "${BITBUCKET_COMMIT}" | cut -c1-7)"
+          - VERSION="${ENVIRONMENT_NAME}-${SHORT_SHA}"
+          - docker login $AZURE_SND_REGISTRY_URL --username $AZURE_SND_REGISTRY_USERNAME --password $AZURE_SND_REGISTRY_PASSWORD
+          - docker build --build-arg VITE_SUPABASE_URL=${VITE_SUPABASE_URL} --build-arg VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY} -t ${AZURE_SND_REGISTRY_URL}/${IMAGE}:${VERSION} .     
+          - docker push ${AZURE_SND_REGISTRY_URL}/${IMAGE}:${VERSION}
+
+    - step: &download_ninja_service_helm_chart_step
+        name: "Download Helm chart - Ninja Service"
+        image: alpine/helm:3.10.0
+        script:
+          - helm registry login $DOCKER_REGISTRY_ID --username $DOCKER_REGISTRY_USERNAME --password $DOCKER_REGISTRY_PASSWORD
+          - helm pull oci://${DOCKER_REGISTRY_ID}/helm/ninja-service --version $HELM_VERSION
+          - tar zxvf ninja-service-*.tgz
+        artifacts:
+          - ninja-service/**
+          
+    - step: &deploy_to_k8s_hetzner_QA_step
+        name: "Deploy to Hetzner"
+        runs-on:
+          - snd
+          - springboot
+          - self.hosted
+          - linux.shell
+
+        script:
+          - IMAGE_TAG="${ENVIRONMENT_NAME}-$(echo "${BITBUCKET_COMMIT}" | cut -c1-7)"
+          - deploy-snd-hetzner-k8s-bckp.sh supabase-mantra-ui supabase-mantra-ui
+    - step: &deploy_to_k8s_hetzner_PROD_step
+        name: "Deploy to Hetzner"
+        runs-on:
+          - snd
+          - springboot
+          - self.hosted
+          - linux.shell
+
+        script:
+          - IMAGE_TAG="${ENVIRONMENT_NAME}-$(echo "${BITBUCKET_COMMIT}" | cut -c1-7)"
+          - deploy-snd-hetzner-k8s-bckp.sh supabase-mantra-ui supabase-mantra-ui
+  caches:
+    npm: ~/.npm
+    pnpm: ~/.pnpm
+  clone:
+    depth: full
+  services:
+    docker:
+      memory: 3072
+pipelines:
+  custom:
+    deploy-to-qa:
+      - step: *download_ninja_service_helm_chart_step
+      - stage:
+          name: 'Build & Deploy to QA'
+          deployment: 'QA'
+          steps:
+            - step: *build_docker_script_step
+            - step: *deploy_to_k8s_hetzner_QA_step
+
+    deploy-to-prod-hetz:
+      - step: *download_ninja_service_helm_chart_step
+      - stage:
+          name: 'Build & Deploy to Production hetzner'
+          deployment: 'Production Hetzner k8s'
+          trigger: manual
+          steps: 
+            - step: *build_docker_script_step
+            - step: *deploy_to_k8s_hetzner_PROD_step
