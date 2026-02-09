@@ -1,0 +1,5 @@
+VITE_SUPABASE_URL=http://77.42.38.166:8000
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY4OTI3MTYwLCJleHAiOjE5MjY2MDcxNjB9.1WGGuzqJws6535KY9wd332FhJRs6BgxWdyafJY-UdxI
+
+
+# curl working on this "http://77.42.38.166:8000/auth/v1/health"
