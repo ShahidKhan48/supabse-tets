@@ -35,24 +35,23 @@ RUN npm run build || (echo "Build failed. Check the error above." && exit 1)
 RUN ls -la /app/dist || (echo "Build failed - dist directory not found" && exit 1)
 RUN test -f /app/dist/index.html || (echo "Build failed - index.html not found" && exit 1)
 
-# Stage 2: Production server with Nginx
-FROM nginx:alpine
+# Stage 2: Production server with Node.js serve
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install serve package globally
+RUN npm install -g serve
 
 # Copy built assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Verify nginx config is valid
-RUN nginx -t
+COPY --from=builder /app/dist ./dist
 
 # Expose port 80
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start serve on port 80
+CMD ["serve", "-s", "dist", "-l", "80"]
